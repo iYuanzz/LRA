@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卡通版：爱情资源平衡器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans SC', sans-serif; }
+        .chart-container { position: relative; width: 100%; max-width: 500px; margin: 0 auto; height: 380px; }
+        input[type=range] { -webkit-appearance: none; appearance: none; cursor: pointer; border-radius: 999px; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 22px; width: 22px;
+            border-radius: 50%; background: white;
+            border: 3px solid currentColor; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            margin-top: -8px;
+        }
+        #passion { accent-color: #ef4444; color: #ef4444; }
+        #intimacy { accent-color: #3b82f6; color: #3b82f6; }
+        #commitment { accent-color: #10b981; color: #10b981; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-pink-50 text-stone-800">
+
+    <main class="container mx-auto p-4 md:p-8 max-w-5xl min-h-screen flex flex-col justify-center">
+        <header class="text-center my-6">
+            <h1 class="text-4xl md:text-5xl font-bold text-rose-600 mb-2">💘 爱情能量平衡器</h1>
+            <p class="text-stone-500 italic">“爱是资源的合理分配，每个维度最高10分，总分上限15分”</p>
+            <div class="inline-block mt-4 bg-white border-2 border-rose-200 text-rose-600 px-6 py-2 rounded-full font-bold shadow-sm">
+                当前已分配能量：<span id="current-total">0</span> / 15
+            </div>
+        </header>
+
+        <section class="bg-white p-6 md:p-10 rounded-3xl shadow-xl border-4 border-rose-100">
+            <div class="grid md:grid-cols-2 gap-10 items-center">
+                
+                <div class="space-y-8">
+                    <div class="bg-red-50 p-4 rounded-2xl border border-red-100 transition-all">
+                        <label class="block font-bold text-red-600 flex justify-between mb-2">
+                            <span>🔥 激情 Passion</span>
+                            <span id="p-val" class="bg-red-500 text-white px-3 rounded-full">0</span>
+                        </label>
+                        <input type="range" id="passion" min="0" max="10" value="0" class="w-full h-3 bg-red-100 rounded-lg">
+                    </div>
+
+                    <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 transition-all">
+                        <label class="block font-bold text-blue-600 flex justify-between mb-2">
+                            <span>😊 亲密 Intimacy</span>
+                            <span id="i-val" class="bg-blue-500 text-white px-3 rounded-full">0</span>
+                        </label>
+                        <input type="range" id="intimacy" min="0" max="10" value="0" class="w-full h-3 bg-blue-100 rounded-lg">
+                    </div>
+
+                    <div class="bg-green-50 p-4 rounded-2xl border border-green-100 transition-all">
+                        <label class="block font-bold text-green-600 flex justify-between mb-2">
+                            <span>⚖️ 承诺 Commitment</span>
+                            <span id="c-val" class="bg-green-500 text-white px-3 rounded-full">0</span>
+                        </label>
+                        <input type="range" id="commitment" min="0" max="10" value="0" class="w-full h-3 bg-green-100 rounded-lg">
+                    </div>
+                  
+                    <button id="showBtn" class="bg-rose-500 text-white font-bold py-4 px-6 rounded-2xl w-full text-xl shadow-lg hover:bg-rose-600 active:scale-95 transition-all">
+                        生成爱情诊断报告 ✨
+                    </button>
+
+                    <div id="resultBox" class="bg-rose-50 p-6 rounded-2xl border-2 border-dashed border-rose-200 hidden animate-fade-in">
+                        <h3 class="text-2xl font-bold text-rose-600 mb-2" id="res-title"></h3>
+                        <p class="text-stone-600 text-sm leading-relaxed mb-4" id="res-desc"></p>
+                        <h4 class="text-md font-bold text-stone-700 bg-white inline-block px-3 py-1 rounded-lg" id="res-eg"></h4>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="loveChart"></canvas>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const sliders = { p: document.getElementById('passion'), i: document.getElementById('intimacy'), c: document.getElementById('commitment') };
+            const labels = { p: document.getElementById('p-val'), i: document.getElementById('i-val'), c: document.getElementById('c-val') };
+            const totalDisplay = document.getElementById('current-total');
+            const MAX_TOTAL = 15;
+
+            // 爱情类型数据
+            const loveData = [
+                { type: "完美式爱情 💖", eg: "模范夫妻", desc: "哇！你们拥有了全部。激情、亲密和承诺交织成最完美的平衡点。" },
+                { type: "伴侣式爱情 ☕", eg: "老夫老妻", desc: "平淡中见真情，虽然没有了烈火般的冲动，但守护已成为本能。" },
+                { type: "浪漫式爱情 🌹", eg: "热恋情侣", desc: "此刻眼中只有彼此，哪怕未来充满变数，也要享受当下的心动。" },
+                { type: "愚蠢式爱情 ⚡", eg: "闪婚/闪恋", desc: "仅靠誓言和激情支撑，还没来得及建立起深厚的灵魂共鸣。" },
+                { type: "空洞式爱情 🧱", eg: "责任婚姻", desc: "爱已随风去，留下的只有对承诺的坚守和习惯性的责任。" },
+                { type: "迷恋式爱情 🍭", eg: "单相思/偶像崇拜", desc: "这更像是一场华丽的幻觉，强烈的吸引力让你有些眩晕。" },
+                { type: "喜欢式爱情 🤝", eg: "灵魂知己", desc: "你们是最懂彼此的人，只是少了一点心跳加速的感觉。" },
+                { type: "非爱 🍃", eg: "泛泛之交", desc: "生活中的过客，没有深刻的联结，也没有激烈的火花。" }
+            ];
+
+            // 初始化雷达图
+            const ctx = document.getElementById('loveChart').getContext('2d');
+            const myChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['🔥 激情', '😊 亲密', '⚖️ 承诺'],
+                    datasets: [{
+                        data: [0, 0, 0], // 初始全为0
+                        backgroundColor: 'rgba(244, 63, 94, 0.2)',
+                        borderColor: '#f43f5e',
+                        borderWidth: 4,
+                        pointRadius: 6,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#f43f5e',
+                        pointBorderWidth: 3,
+                        tension: 0.4 // 圆润线条
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            min: 0, max: 10,
+                            beginAtZero: true,
+                            grid: { color: '#fee2e2' },
+                            angleLines: { color: '#fecdd3' },
+                            ticks: { display: false },
+                            pointLabels: { font: { size: 16, weight: 'bold' }, color: '#e11d48' }
+                        }
+                    },
+                    plugins: { legend: { display: false } },
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            // 核心资源逻辑
+            function updateAll(changedKey) {
+                let p = parseInt(sliders.p.value);
+                let i = parseInt(sliders.i.value);
+                let c = parseInt(sliders.c.value);
+
+                // 如果总分超标，动态挤压其他滑块
+                while (p + i + c > MAX_TOTAL) {
+                    if (changedKey === 'p') { if (i > 0) i--; else if (c > 0) c--; }
+                    else if (changedKey === 'i') { if (p > 0) p--; else if (c > 0) c--; }
+                    else if (changedKey === 'c') { if (p > 0) p--; else if (i > 0) i--; }
+                }
+
+                // 同步 UI
+                sliders.p.value = p; sliders.i.value = i; sliders.c.value = c;
+                labels.p.textContent = p; labels.i.textContent = i; labels.c.textContent = c;
+                totalDisplay.textContent = p + i + c;
+
+                // 更新图表
+                myChart.data.datasets[0].data = [p, i, c];
+                myChart.update('none');
+            }
+
+            // 监听滑块
+            Object.keys(sliders).forEach(key => {
+                sliders[key].addEventListener('input', () => updateAll(key));
+            });
+
+            // 生成结果
+            document.getElementById('showBtn').addEventListener('click', () => {
+                const pVal = parseInt(sliders.p.value);
+                const iVal = parseInt(sliders.i.value);
+                const cVal = parseInt(sliders.c.value);
+
+                if (pVal + iVal + cVal === 0) {
+                    alert("请先分配一点爱情能量吧！");
+                    return;
+                }
+
+                const p = pVal >= 5;
+                const i = iVal >= 5;
+                const c = cVal >= 5;
+                
+                let res;
+                if (p && i && c) res = loveData[0];
+                else if (!p && i && c) res = loveData[1];
+                else if (p && i && !c) res = loveData[2];
+                else if (p && !i && c) res = loveData[3];
+                else if (!p && !i && c) res = loveData[4];
+                else if (p && !i && !c) res = loveData[5];
+                else if (!p && i && !c) res = loveData[6];
+                else res = loveData[7];
+
+                document.getElementById('res-title').textContent = res.type;
+                document.getElementById('res-desc').textContent = res.desc;
+                document.getElementById('res-eg').textContent = "例如：" + res.eg;
+                
+                const box = document.getElementById('resultBox');
+                box.classList.remove('hidden');
+                box.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+    </script>
+</body>
+</html>
